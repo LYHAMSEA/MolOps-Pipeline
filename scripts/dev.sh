@@ -134,7 +134,7 @@ PYEOF
   run)
     echo "Starting MolOps API in dev mode (auto-reload)..."
     echo "API docs: http://localhost:8001/docs"
-    uvicorn molops.api:app --host 0.0.0.0 --port 8001 --reload --log-level debug
+    uvicorn molops.api:app --host 0.0.0.0 --port 8001 --reload --workers 1 --log-level info
     ;;
 
   mlflow)
