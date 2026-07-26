@@ -6,7 +6,7 @@ import mlflow
 import mlflow.sklearn
 import numpy as np
 from sklearn.ensemble import RandomForestRegressor
-from sklearn.metrics import mean_squared_error, r2_score
+from sklearn.metrics import root_mean_squared_error, r2_score
 from sklearn.model_selection import train_test_split
 from xgboost import XGBRegressor
 
@@ -62,7 +62,7 @@ def train_random_forest(
         model.fit(X_train, y_train)
 
         y_pred = model.predict(X_test)
-        rmse = float(mean_squared_error(y_test, y_pred, squared=False))
+        rmse = float(root_mean_squared_error(y_test, y_pred))
         r2 = float(r2_score(y_test, y_pred))
 
         mlflow.log_metrics({"test_rmse": rmse, "test_r2": r2})
@@ -114,7 +114,7 @@ def train_xgboost(
         model.fit(X_train, y_train)
 
         y_pred = model.predict(X_test)
-        rmse = float(mean_squared_error(y_test, y_pred, squared=False))
+        rmse = float(root_mean_squared_error(y_test, y_pred))
         r2 = float(r2_score(y_test, y_pred))
 
         mlflow.log_metrics({"test_rmse": rmse, "test_r2": r2})
