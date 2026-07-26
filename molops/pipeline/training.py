@@ -4,6 +4,7 @@ import logging
 
 import mlflow
 import mlflow.sklearn
+import mlflow.xgboost
 import numpy as np
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import root_mean_squared_error, r2_score
@@ -118,7 +119,7 @@ def train_xgboost(
         r2 = float(r2_score(y_test, y_pred))
 
         mlflow.log_metrics({"test_rmse": rmse, "test_r2": r2})
-        mlflow.sklearn.log_model(model, "xgboost")
+        mlflow.xgboost.log_model(model, "xgboost")
 
         logger.info(
             "XGBoost -- RMSE=%.3f  R2=%.3f  run=%s",
