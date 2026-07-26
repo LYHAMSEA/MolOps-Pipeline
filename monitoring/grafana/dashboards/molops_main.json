@@ -1,0 +1,76 @@
+{
+  "title": "MolOps -- Drug Bioactivity Prediction Dashboard",
+  "uid": "molops-main-v1",
+  "tags": ["molops", "cheminformatics", "drug-discovery"],
+  "schemaVersion": 39,
+  "refresh": "10s",
+  "time": { "from": "now-1h", "to": "now" },
+  "panels": [
+    {
+      "id": 1, "type": "stat", "title": "Total Predictions",
+      "gridPos": {"h":4,"w":4,"x":0,"y":0},
+      "targets": [{"expr": "sum(molops_predictions_total)", "legendFormat": "Total"}],
+      "fieldConfig": {"defaults": {"color": {"mode": "fixed", "fixedColor": "blue"}}}
+    },
+    {
+      "id": 2, "type": "stat", "title": "Successful Predictions",
+      "gridPos": {"h":4,"w":4,"x":4,"y":0},
+      "targets": [{"expr": "sum(molops_predictions_total{outcome='success'})", "legendFormat": "Success"}],
+      "fieldConfig": {"defaults": {"color": {"mode": "fixed", "fixedColor": "green"}}}
+    },
+    {
+      "id": 3, "type": "stat", "title": "Outside Applicability Domain",
+      "gridPos": {"h":4,"w":4,"x":8,"y":0},
+      "targets": [{"expr": "sum(molops_outside_applicability_domain_total)", "legendFormat": "Outside AD"}],
+      "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "thresholds": {"steps": [{"color": "green","value": 0},{"color": "yellow","value": 10},{"color": "red","value": 50}]}}}
+    },
+    {
+      "id": 4, "type": "gauge", "title": "Avg Model Confidence (Tanimoto)",
+      "gridPos": {"h":6,"w":6,"x":12,"y":0},
+      "targets": [{"expr": "avg(molops_last_confidence_score)", "legendFormat": "Confidence"}],
+      "fieldConfig": {"defaults": {"min": 0, "max": 1, "thresholds": {"steps": [{"color":"red","value":0},{"color":"yellow","value":0.3},{"color":"green","value":0.6}]}}}
+    },
+    {
+      "id": 5, "type": "gauge", "title": "Avg Max Tanimoto",
+      "gridPos": {"h":6,"w":6,"x":18,"y":0},
+      "targets": [{"expr": "avg(molops_last_max_tanimoto)", "legendFormat": "Tanimoto"}],
+      "fieldConfig": {"defaults": {"min": 0, "max": 1, "thresholds": {"steps": [{"color":"red","value":0},{"color":"yellow","value":0.4},{"color":"green","value":0.7}]}}}
+    },
+    {
+      "id": 6, "type": "timeseries", "title": "Prediction Rate (per minute)",
+      "gridPos": {"h":8,"w":12,"x":0,"y":4},
+      "targets": [
+        {"expr": "rate(molops_predictions_total{outcome='success'}[5m]) * 60", "legendFormat": "Success/min"},
+        {"expr": "rate(molops_predictions_total{outcome='error'}[5m]) * 60", "legendFormat": "Error/min"},
+        {"expr": "rate(molops_predictions_total{outcome='outside_ad'}[5m]) * 60", "legendFormat": "Outside AD/min"}
+      ],
+      "fieldConfig": {"defaults": {"custom": {"lineWidth": 2}}}
+    },
+    {
+      "id": 7, "type": "timeseries", "title": "Prediction Latency (P50/P95/P99)",
+      "gridPos": {"h":8,"w":12,"x":12,"y":4},
+      "targets": [
+        {"expr": "histogram_quantile(0.50, rate(molops_prediction_latency_seconds_bucket[5m]))", "legendFormat": "P50"},
+        {"expr": "histogram_quantile(0.95, rate(molops_prediction_latency_seconds_bucket[5m]))", "legendFormat": "P95"},
+        {"expr": "histogram_quantile(0.99, rate(molops_prediction_latency_seconds_bucket[5m]))", "legendFormat": "P99"}
+      ],
+      "fieldConfig": {"defaults": {"unit": "s", "custom": {"lineWidth": 2}}}
+    },
+    {
+      "id": 8, "type": "timeseries", "title": "Predicted pIC50 Distribution",
+      "gridPos": {"h":8,"w":12,"x":0,"y":12},
+      "targets": [
+        {"expr": "rate(molops_predicted_pic50_sum[5m]) / rate(molops_predicted_pic50_count[5m])", "legendFormat": "Avg pIC50"}
+      ],
+      "fieldConfig": {"defaults": {"unit": "short", "custom": {"lineWidth": 2}}}
+    },
+    {
+      "id": 9, "type": "timeseries", "title": "Applicability Domain Violations Over Time",
+      "gridPos": {"h":8,"w":12,"x":12,"y":12},
+      "targets": [
+        {"expr": "rate(molops_outside_applicability_domain_total[10m]) * 600", "legendFormat": "Outside AD / 10 min"}
+      ],
+      "fieldConfig": {"defaults": {"custom": {"lineWidth": 2}, "thresholds": {"steps": [{"color":"green","value":0},{"color":"red","value":5}]}}}
+    }
+  ]
+}
