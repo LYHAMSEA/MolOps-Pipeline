@@ -1,0 +1,64 @@
+groups:
+
+  - name: molops.api
+    rules:
+
+      - alert: MolOpsAPIDown
+        expr: up{job="molops-api"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          team: molops
+        annotations:
+          summary: "MolOps API is unreachable"
+          description: "Prometheus cannot scrape /metrics. All predictions suspended."
+
+      - alert: HighPredictionErrorRate
+        expr: |
+          rate(molops_predictions_total{outcome="error"}[5m])
+          / (rate(molops_predictions_total[5m]) + 0.001) > 0.10
+        for: 3m
+        labels:
+          severity: warning
+          team: molops
+        annotations:
+          summary: "More than 10% of predictions are failing"
+          description: "Error rate is {{ $value | humanizePercentage }} over last 5 minutes."
+
+      - alert: HighApplicabilityDomainViolations
+        expr: |
+          rate(molops_outside_applicability_domain_total[10m]) > 0.5
+        for: 5m
+        labels:
+          severity: warning
+          team: molops
+        annotations:
+          summary: "Many queries are outside the model's applicability domain"
+          description: >
+            More than 50% of recent queries are for molecules unlike the training set.
+            Model predictions may be unreliable. Consider retraining with more diverse data.
+
+      - alert: SlowPredictionLatency
+        expr: |
+          histogram_quantile(0.95,
+            rate(molops_prediction_latency_seconds_bucket[5m])
+          ) > 2.0
+        for: 5m
+        labels:
+          severity: warning
+          team: molops
+        annotations:
+          summary: "95th percentile prediction latency above 2 seconds"
+          description: "P95 latency is {{ $value | humanizeDuration }}."
+
+      - alert: LowModelConfidence
+        expr: avg(molops_last_confidence_score) < 0.3
+        for: 10m
+        labels:
+          severity: warning
+          team: molops
+        annotations:
+          summary: "Average model confidence score is very low"
+          description: >
+            Average Tanimoto similarity to training set is {{ $value | printf "%.2f" }}.
+            This suggests the model is being queried on chemistry it has not seen.
