@@ -10,6 +10,9 @@ from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import root_mean_squared_error, r2_score
 from sklearn.model_selection import train_test_split
 from xgboost import XGBRegressor
+import os
+
+os.environ.setdefault("MLFLOW_TRACKING_URI", "sqlite:///mlflow.db")
 
 logger = logging.getLogger(__name__)
 
