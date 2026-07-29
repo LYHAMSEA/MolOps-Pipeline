@@ -11,7 +11,7 @@ rule_files:
 scrape_configs:
   - job_name: "molops-api"
     static_configs:
-      - targets: ["192.168.56.20:8001"]
+      - targets: ["localhost:8001"]
     metrics_path: "/metrics"
     scrape_interval: 10s
 
