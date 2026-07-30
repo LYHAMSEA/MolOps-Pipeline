@@ -78,7 +78,6 @@ def train_random_forest(
         )
         return run.info.run_id, rmse, r2
 
-        model.save_model("models/xgboost.json")
 
 
 def train_xgboost(
@@ -131,6 +130,8 @@ def train_xgboost(
             rmse, r2, run.info.run_id,
         )
         return run.info.run_id, rmse, r2
+
+        model.save_model("models/xgboost.json")
 
 
 def meets_minimum_performance(rmse: float, r2: float) -> bool:
