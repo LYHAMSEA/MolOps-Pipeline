@@ -125,13 +125,14 @@ def train_xgboost(
         mlflow.log_metrics({"test_rmse": rmse, "test_r2": r2})
         mlflow.xgboost.log_model(model, "xgboost")
 
+        model.save_model("models/xgboost.json")
+
         logger.info(
             "XGBoost -- RMSE=%.3f  R2=%.3f  run=%s",
             rmse, r2, run.info.run_id,
         )
         return run.info.run_id, rmse, r2
 
-        model.save_model("models/xgboost.json")
 
 
 def meets_minimum_performance(rmse: float, r2: float) -> bool:
