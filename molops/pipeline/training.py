@@ -78,6 +78,8 @@ def train_random_forest(
         )
         return run.info.run_id, rmse, r2
 
+        model.save_model("models/xgboost.json")
+
 
 def train_xgboost(
     X: np.ndarray,
