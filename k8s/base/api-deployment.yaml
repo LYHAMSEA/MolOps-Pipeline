@@ -1,0 +1,66 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: molops-api
+  namespace: molops
+  labels:
+    app: molops-api
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: molops-api
+  template:
+    metadata:
+      labels:
+        app: molops-api
+    spec:
+      containers:
+        - name: molops-api
+          image: lyhamsea/molops:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8001
+              name: http
+          envFrom:
+            - configMapRef:
+                name: molops-config
+            - secretRef:
+                name: molops-secrets
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8001
+            initialDelaySeconds: 15
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: 8001
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "512Mi"
+            limits:
+              cpu: "1000m"
+              memory: "1Gi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: molops-api
+  namespace: molops
+spec:
+  selector:
+    app: molops-api
+  ports:
+    - port: 8001
+      targetPort: 8001
+      name: http
+  type: ClusterIP
