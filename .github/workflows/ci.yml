@@ -1,0 +1,220 @@
+name: MolOps CI/CD
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*.*.*"]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHON_VERSION: "3.11"
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  lint:
+    name: Lint and type-check
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - name: Install lint tools
+        run: pip install ".[lint]"
+
+      - name: Ruff -- fix and check
+        run: ruff check molops/ tests/ --output-format=github --fix
+
+      - name: Ruff -- format
+        run: ruff format molops/ tests/
+
+      - name: Commit any auto-fixes
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git diff --quiet && echo "Nothing to commit" || \
+            (git add -A && git commit -m "style: auto-fix ruff lint and format" && git push)
+
+      - name: Ruff -- verify format
+        run: ruff format --check molops/ tests/
+
+      - name: Mypy -- type check
+        run: mypy molops/
+
+      - name: Bandit -- security scan
+        run: bandit -r molops/ -c pyproject.toml
+
+      - name: MolOps pipeline linter
+        run: python linting/molops_linter.py molops/pipeline/ --strict
+
+      - name: Check .env.example has no real secrets
+        run: |
+          if grep -Eq "(password|secret|key|token)\s*=\s*[A-Za-z0-9+/]{20,}" \
+              .env.example 2>/dev/null; then
+            echo "ERROR: .env.example appears to contain real secrets"
+            exit 1
+          fi
+          echo "env.example looks clean"
+
+  test:
+    name: Test (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    needs: lint
+
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]
+
+    env:
+      MOLOPS_ENV: test
+      MLFLOW_TRACKING_URI: ./mlruns_ci
+      MODEL_PATH: models/test_model.joblib
+      SMILES_PATH: models/test_smiles.txt
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Miniconda (needed for RDKit)
+        uses: conda-incubator/setup-miniconda@v3
+        with:
+          python-version: ${{ matrix.python-version }}
+          channels: conda-forge,defaults
+          channel-priority: true
+
+      - name: Install RDKit via conda
+        shell: bash -el {0}
+        run: conda install -c conda-forge rdkit -y
+
+      - name: Install Python dependencies
+        shell: bash -el {0}
+        run: pip install -e ".[dev,lint]"
+
+      - name: Run unit tests
+        shell: bash -el {0}
+        run: |
+          pytest tests/unit/ \
+            --cov=molops \
+            --cov-report=xml \
+            --cov-report=term-missing \
+            -m "not integration" \
+            --timeout=60
+
+      - name: Run integration tests
+        shell: bash -el {0}
+        run: |
+          pytest tests/integration/ \
+            --cov=molops \
+            --cov-report=xml \
+            --cov-append \
+            -m integration \
+            --timeout=120
+
+      - name: Upload coverage
+        uses: codecov/codecov-action@v4
+        if: matrix.python-version == env.PYTHON_VERSION
+        with:
+          files: coverage.xml
+
+  build:
+    name: Build and push Docker image
+    runs-on: ubuntu-latest
+    needs: test
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: lyhamsea/molops
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=ref,event=branch
+            type=sha,prefix=sha-,format=short
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          dockerfile: Dockerfile
+          target: runtime
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            BUILD_DATE=${{ github.event.repository.updated_at }}
+            GIT_SHA=${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          platforms: linux/amd64,linux/arm64
+
+      - name: Print image summary
+        run: |
+          echo "## Docker Image Published" >> $GITHUB_STEP_SUMMARY
+          echo "**Tags:** ${{ steps.meta.outputs.tags }}" >> $GITHUB_STEP_SUMMARY
+          echo "Pull: docker pull lyhamsea/molops:latest" >> $GITHUB_STEP_SUMMARY
+
+  release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          PREV=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+          if [ -z "$PREV" ]; then
+            CHANGES=$(git log --pretty=format:"- %s (%h)" HEAD)
+          else
+            CHANGES=$(git log --pretty=format:"- %s (%h)" ${PREV}..HEAD)
+          fi
+          echo "CHANGES<<EOF" >> $GITHUB_OUTPUT
+          echo "$CHANGES" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          body: |
+
+            ${{ steps.changelog.outputs.CHANGES }}
+
+            ```bash
+            docker pull lyhamsea/molops:${{ github.ref_name }}
+            ```
+          prerelease: ${{ contains(github.ref_name, '-rc') }}
