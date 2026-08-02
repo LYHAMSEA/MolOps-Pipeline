@@ -4,6 +4,7 @@ namespace: molops
 resources:
   - namespace.yaml
   - configmap.yaml
+  - secret.yaml
   - api-deployment.yaml
   - mlflow-deployment.yaml
   - hpa.yaml
