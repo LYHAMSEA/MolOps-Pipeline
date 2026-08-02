@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: molops-config
+  namespace: molops
+data:
+  MOLOPS_TARGET: "EGFR"
+  MOLOPS_ENV: "production"
+  MOLOPS_LOG_LEVEL: "info"
+  MOLOPS_SENSOR_BACKEND: "simulated"
+  MOLOPS_METRICS_PATH: "/metrics"
+  MLFLOW_EXPERIMENT_NAME: "molops-egfr-bioactivity"
+  MODEL_PATH: "/app/models/random_forest.joblib"
+  SMILES_PATH: "/app/models/training_smiles.txt"
